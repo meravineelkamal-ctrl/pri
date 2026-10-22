@@ -29,15 +29,22 @@ app.disable("x-powered-by");
 app.use(express.urlencoded({ extended: false, limit: "10kb" }));
 app.use(express.json({ limit: "10kb" }));
 
-const websiteOrigin = process.env.WEBSITE_ORIGIN || "https://winter-heart-fab3.meravineelkamal.workers.dev";
+const defaultWebsiteOrigin = "https://winter-heart-fab3.meravineelkamal.workers.dev";
+const configuredWebsiteOrigins = (process.env.WEBSITE_ORIGIN || defaultWebsiteOrigin)
+  .split(",")
+  .map(origin => origin.trim())
+  .filter(Boolean)
+  .map(origin => new URL(origin).origin);
+const allowedWebsiteOrigins = new Set([defaultWebsiteOrigin, ...configuredWebsiteOrigins]);
+const websiteOrigin = configuredWebsiteOrigins[0] || defaultWebsiteOrigin;
 app.use((req, res, next) => {
   const origin = req.get("origin");
-  if (websiteOrigin && origin && origin !== websiteOrigin) {
+  if (origin && !allowedWebsiteOrigins.has(origin)) {
     res.status(403).json({ error: "Origin not allowed" });
     return;
   }
   if (origin) {
-    res.setHeader("Access-Control-Allow-Origin", websiteOrigin || origin);
+    res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -105,7 +112,8 @@ app.post("/api/create-order", async (req, res) => {
     });
 
     try {
-      const redirectUrl = new URL("/", websiteOrigin);
+      const redirectOrigin = req.get("origin") || websiteOrigin;
+      const redirectUrl = new URL("/", redirectOrigin);
       redirectUrl.searchParams.set("payment_return", "1");
       redirectUrl.searchParams.set("order_id", orderId);
       const parameters = new URLSearchParams({
