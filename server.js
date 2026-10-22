@@ -90,7 +90,8 @@ app.post("/api/create-order", async (req, res) => {
   try {
     const bookSnapshots = await Promise.all(rawBookIds.map(id => db.collection("books").doc(id).get()));
     const fileSnapshots = await Promise.all(rawBookIds.map(id => db.collection("bookFiles").doc(id).get()));
-    if (bookSnapshots.some(snapshot => !snapshot.exists) || fileSnapshots.some(snapshot => !snapshot.exists)) {
+    if (bookSnapshots.some(snapshot => !snapshot.exists || snapshot.data().active === false)
+      || fileSnapshots.some(snapshot => !snapshot.exists)) {
       res.status(400).json({ error: "One or more selected books are unavailable" });
       return;
     }
